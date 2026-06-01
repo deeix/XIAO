@@ -31,6 +31,7 @@ final class BLEManager: NSObject, ObservableObject {
     private var connectedPeripheral: CBPeripheral?
     private let savedPeripheralKey = "savedPeripheralIdentifier"
     private let centralRestoreIdentifier = "com.example.XIAOCompanion.central"
+    private let xiaoBridgeServiceUUID = CBUUID(string: "6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
 
     override init() {
         super.init()
@@ -49,6 +50,7 @@ final class BLEManager: NSObject, ObservableObject {
 
         devices.removeAll()
         isScanning = true
+        addAlreadyConnectedPeripherals()
         central.scanForPeripherals(withServices: nil, options: [
             CBCentralManagerScanOptionAllowDuplicatesKey: false
         ])
@@ -87,6 +89,24 @@ final class BLEManager: NSObject, ObservableObject {
         } else {
             startScanning()
             addEvent(title: "Saved device not cached", body: "Scanning for it now.")
+        }
+    }
+
+    private func addAlreadyConnectedPeripherals() {
+        let peripherals = central.retrieveConnectedPeripherals(withServices: [xiaoBridgeServiceUUID])
+        peripherals.forEach { peripheral in
+            let device = BLEDevice(id: peripheral.identifier,
+                                   peripheral: peripheral,
+                                   name: peripheral.name ?? "XIAO Bridge",
+                                   rssi: 0)
+
+            if !devices.contains(where: { $0.id == device.id }) {
+                devices.append(device)
+            }
+        }
+
+        if !peripherals.isEmpty {
+            addEvent(title: "Found connected XIAO", body: "Tap it to attach the app.")
         }
     }
 
