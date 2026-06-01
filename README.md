@@ -9,6 +9,8 @@ The app:
 - subscribes to every notify/indicate characteristic it finds;
 - logs incoming BLE packets as text or hex;
 - can POST received packets to your API endpoint.
+- remembers the selected BLE peripheral and tries to reconnect later;
+- shows a local iOS notification when XIAO sends a BLE packet.
 
 ## Build IPA with GitHub Actions
 
@@ -36,3 +38,15 @@ SideStore signs it on the phone.
 5. Send data from XIAO through a notify characteristic.
 
 For database upload, enter an HTTPS endpoint and enable auto upload.
+
+## Background behavior
+
+The app includes `bluetooth-central` background mode. iOS can wake it for BLE events, restored connections, and reconnects, but it does not allow unlimited background execution.
+
+Important: the app cannot directly see the private system ANCS connection state. If XIAO is connected to iOS for ANCS, your firmware should also expose a custom BLE service/characteristic and send a packet like:
+
+```json
+{"type":"status","ancs_connected":true}
+```
+
+The app will display any packet it receives and show a local notification.

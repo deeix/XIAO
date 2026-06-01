@@ -3,7 +3,8 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var ble: BLEManager
     @AppStorage("apiEndpoint") private var apiEndpoint = ""
-    @State private var autoUpload = false
+    @AppStorage("autoUpload") private var autoUpload = false
+    @AppStorage("autoReconnect") private var autoReconnect = true
 
     var body: some View {
         NavigationStack {
@@ -24,6 +25,18 @@ struct ContentView: View {
                 }
 
                 Section("Connection") {
+                    Toggle("Auto reconnect", isOn: $autoReconnect)
+                        .onChange(of: autoReconnect) { value in
+                            ble.autoReconnect = value
+                            if value {
+                                ble.reconnectToSavedDevice()
+                            }
+                        }
+
+                    Button("Reconnect saved XIAO") {
+                        ble.reconnectToSavedDevice()
+                    }
+
                     Button(ble.isScanning ? "Stop Scan" : "Scan for XIAO") {
                         ble.isScanning ? ble.stopScanning() : ble.startScanning()
                     }
@@ -85,6 +98,7 @@ struct ContentView: View {
             .onAppear {
                 ble.apiEndpoint = apiEndpoint
                 ble.autoUpload = autoUpload
+                ble.autoReconnect = autoReconnect
             }
             .onChange(of: apiEndpoint) { value in
                 ble.apiEndpoint = value

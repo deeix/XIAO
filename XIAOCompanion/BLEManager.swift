@@ -1,5 +1,6 @@
 import CoreBluetooth
 import Foundation
+import UserNotifications
 
 struct BLEDevice: Identifiable, Equatable {
     let id: UUID
@@ -21,16 +22,23 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var events: [BLEEvent] = []
     @Published var connectedName: String?
     @Published var isScanning = false
+    @Published var autoReconnect = true
 
     var apiEndpoint = ""
     var autoUpload = false
 
     private var central: CBCentralManager!
     private var connectedPeripheral: CBPeripheral?
+    private let savedPeripheralKey = "savedPeripheralIdentifier"
+    private let centralRestoreIdentifier = "com.example.XIAOCompanion.central"
 
     override init() {
         super.init()
-        central = CBCentralManager(delegate: self, queue: .main)
+        UNUserNotificationCenter.current().delegate = self
+        central = CBCentralManager(delegate: self, queue: .main, options: [
+            CBCentralManagerOptionRestoreIdentifierKey: centralRestoreIdentifier
+        ])
+        requestNotificationPermission()
     }
 
     func startScanning() {
@@ -55,10 +63,31 @@ final class BLEManager: NSObject, ObservableObject {
 
     func connect(to device: BLEDevice) {
         stopScanning()
+        savePeripheralIdentifier(device.id)
         connectedPeripheral = device.peripheral
         device.peripheral.delegate = self
         connectedName = "Connecting..."
         central.connect(device.peripheral)
+    }
+
+    func reconnectToSavedDevice() {
+        guard central.state == .poweredOn else { return }
+        guard let identifier = savedPeripheralIdentifier else {
+            addEvent(title: "No saved device", body: "Connect to XIAO once, then reconnect will be automatic.")
+            return
+        }
+
+        let peripherals = central.retrievePeripherals(withIdentifiers: [identifier])
+        if let peripheral = peripherals.first {
+            connectedPeripheral = peripheral
+            peripheral.delegate = self
+            connectedName = "Reconnecting..."
+            central.connect(peripheral)
+            addEvent(title: "Reconnect started", body: identifier.uuidString)
+        } else {
+            startScanning()
+            addEvent(title: "Saved device not cached", body: "Scanning for it now.")
+        }
     }
 
     func clearLog() {
@@ -87,6 +116,7 @@ final class BLEManager: NSObject, ObservableObject {
         let body = text?.isEmpty == false ? text! : hex
 
         addEvent(title: "BLE packet", body: body)
+        showLocalNotification(title: "XIAO sent data", body: body)
 
         guard autoUpload else { return }
         upload(payload: [
@@ -121,6 +151,39 @@ final class BLEManager: NSObject, ObservableObject {
             }
         }.resume()
     }
+
+    private var savedPeripheralIdentifier: UUID? {
+        guard let value = UserDefaults.standard.string(forKey: savedPeripheralKey) else { return nil }
+        return UUID(uuidString: value)
+    }
+
+    private func savePeripheralIdentifier(_ identifier: UUID) {
+        UserDefaults.standard.set(identifier.uuidString, forKey: savedPeripheralKey)
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    private func showLocalNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = String(body.prefix(180))
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: UUID().uuidString,
+                                            content: content,
+                                            trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+}
+
+extension BLEManager: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
 }
 
 extension BLEManager: CBCentralManagerDelegate {
@@ -128,6 +191,9 @@ extension BLEManager: CBCentralManagerDelegate {
         switch central.state {
         case .poweredOn:
             bluetoothState = "On"
+            if autoReconnect {
+                reconnectToSavedDevice()
+            }
         case .poweredOff:
             bluetoothState = "Off"
         case .unauthorized:
@@ -161,10 +227,15 @@ extension BLEManager: CBCentralManagerDelegate {
         } else {
             devices.append(device)
         }
+
+        if autoReconnect, savedPeripheralIdentifier == peripheral.identifier {
+            connect(to: device)
+        }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedName = peripheral.name ?? "Connected"
+        savePeripheralIdentifier(peripheral.identifier)
         addEvent(title: "Connected", body: peripheral.identifier.uuidString)
         peripheral.discoverServices(nil)
     }
@@ -181,6 +252,21 @@ extension BLEManager: CBCentralManagerDelegate {
                         error: Error?) {
         connectedName = nil
         addEvent(title: "Disconnected", body: error?.localizedDescription ?? "No error")
+        if autoReconnect {
+            central.connect(peripheral)
+            addEvent(title: "Reconnect queued", body: peripheral.identifier.uuidString)
+        }
+    }
+
+    func centralManager(_ central: CBCentralManager,
+                        willRestoreState dict: [String: Any]) {
+        let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
+        guard let peripheral = peripherals.first else { return }
+
+        connectedPeripheral = peripheral
+        peripheral.delegate = self
+        connectedName = peripheral.name ?? "Restored"
+        addEvent(title: "Bluetooth state restored", body: peripheral.identifier.uuidString)
     }
 }
 
