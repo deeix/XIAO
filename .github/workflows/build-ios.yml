@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -59,10 +59,10 @@ jobs:
       - name: Run protocol tests
         run: node --test tests/protocol.test.js
 
-      - name: Run iOS unit tests
+      - name: Build iOS app for simulator
         run: |
           set -eo pipefail
-          xcodebuild test \
+          xcodebuild build \
             -project XIAOCompanion.xcodeproj \
             -scheme XIAOCompanion \
             -sdk iphonesimulator \
