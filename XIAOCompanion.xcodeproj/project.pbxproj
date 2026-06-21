@@ -11,7 +11,18 @@
 		4F0000022C00000000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0000122C00000000000001 /* ContentView.swift */; };
 		4F0000032C00000000000001 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0000132C00000000000001 /* BLEManager.swift */; };
 		4F0000042C00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4F0000152C00000000000001 /* Assets.xcassets */; };
+		4F1000012C00000000000001 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1000112C00000000000001 /* ProtocolTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4F1000702C00000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4F0000702C00000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4F0000402C00000000000001;
+			remoteInfo = XIAOCompanion;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		4F0000102C00000000000001 /* XIAOCompanion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XIAOCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -20,10 +31,19 @@
 		4F0000132C00000000000001 /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEManager.swift; sourceTree = "<group>"; };
 		4F0000142C00000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4F0000152C00000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4F1000102C00000000000001 /* XIAOCompanionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XIAOCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F1000112C00000000000001 /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		4F0000202C00000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F1000202C00000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -37,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				4F0000312C00000000000001 /* XIAOCompanion */,
+				4F1000302C00000000000001 /* XIAOCompanionTests */,
 				4F0000322C00000000000001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -57,8 +78,17 @@
 			isa = PBXGroup;
 			children = (
 				4F0000102C00000000000001 /* XIAOCompanion.app */,
+				4F1000102C00000000000001 /* XIAOCompanionTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4F1000302C00000000000001 /* XIAOCompanionTests */ = {
+			isa = PBXGroup;
+			children = (
+				4F1000112C00000000000001 /* ProtocolTests.swift */,
+			);
+			path = XIAOCompanionTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -81,6 +111,24 @@
 			productReference = 4F0000102C00000000000001 /* XIAOCompanion.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4F1000402C00000000000001 /* XIAOCompanionTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F1000902C00000000000001 /* Build configuration list for PBXNativeTarget "XIAOCompanionTests" */;
+			buildPhases = (
+				4F1000502C00000000000001 /* Sources */,
+				4F1000202C00000000000001 /* Frameworks */,
+				4F1000602C00000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4F1000712C00000000000001 /* PBXTargetDependency */,
+			);
+			name = XIAOCompanionTests;
+			productName = XIAOCompanionTests;
+			productReference = 4F1000102C00000000000001 /* XIAOCompanionTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -93,6 +141,10 @@
 				TargetAttributes = {
 					4F0000402C00000000000001 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					4F1000402C00000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 4F0000402C00000000000001;
 					};
 				};
 			};
@@ -110,6 +162,7 @@
 			projectRoot = "";
 			targets = (
 				4F0000402C00000000000001 /* XIAOCompanion */,
+				4F1000402C00000000000001 /* XIAOCompanionTests */,
 			);
 		};
 /* End PBXProject section */
@@ -120,6 +173,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				4F0000042C00000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F1000602C00000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,7 +196,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F1000502C00000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F1000012C00000000000001 /* ProtocolTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4F1000712C00000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4F0000402C00000000000001 /* XIAOCompanion */;
+			targetProxy = 4F1000702C00000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4F0000A02C00000000000001 /* Debug */ = {
@@ -259,7 +335,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = XIAOCompanion/Info.plist;
@@ -268,7 +344,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiao.notify;
 				PRODUCT_NAME = "XIAO Notify";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -282,7 +358,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = XIAOCompanion/Info.plist;
@@ -291,12 +367,48 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiao.notify;
 				PRODUCT_NAME = "XIAO Notify";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4F1000B02C00000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xiao.notify.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/XIAO Notify.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/XIAO Notify";
+			};
+			name = Debug;
+		};
+		4F1000B12C00000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xiao.notify.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/XIAO Notify.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/XIAO Notify";
 			};
 			name = Release;
 		};
@@ -317,6 +429,15 @@
 			buildConfigurations = (
 				4F0000B02C00000000000001 /* Debug */,
 				4F0000B12C00000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4F1000902C00000000000001 /* Build configuration list for PBXNativeTarget "XIAOCompanionTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F1000B02C00000000000001 /* Debug */,
+				4F1000B12C00000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

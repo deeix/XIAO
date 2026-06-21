@@ -20,6 +20,15 @@ jobs:
       - name: Run protocol tests
         run: node --test tests/protocol.test.js
 
+      - name: Run iOS unit tests
+        run: |
+          xcodebuild test \
+            -project XIAOCompanion.xcodeproj \
+            -scheme XIAOCompanion \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO
+
       - name: Build unsigned app
         run: |
           xcodebuild \

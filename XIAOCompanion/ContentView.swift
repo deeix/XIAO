@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 private enum NotificationFilter: String, CaseIterable, Identifiable {
@@ -68,7 +69,13 @@ private struct NotificationsView: View {
             }
             .safeAreaInset(edge: .top) {
                 VStack(spacing: 10) {
-                    ConnectionBanner()
+                    NavigationLink {
+                        ModuleStatusView()
+                    } label: {
+                        ConnectionBanner()
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(NotificationFilter.allCases) { item in
@@ -103,8 +110,129 @@ private struct ConnectionBanner: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal)
+    }
+}
+
+private struct ModuleStatusView: View {
+    @EnvironmentObject private var ble: BLEManager
+    @State private var now = Date()
+    private let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+
+    private var status: ModuleStatus { ble.moduleStatus }
+    private var isStale: Bool {
+        guard let updated = status.lastUpdated else { return true }
+        return now.timeIntervalSince(updated) > 10
+    }
+
+    private var stateTitle: String {
+        switch status.state {
+        case "ready": return "Готов"
+        case "pairing": return "Сопряжение"
+        case "discovering_ancs": return "Поиск ANCS"
+        case "connected": return "Подключён"
+        case "advertising": return "Ожидает телефон"
+        case "offline": return "Нет связи"
+        default: return status.state
+        }
+    }
+
+    private var stateColor: Color {
+        if !status.lastError.isEmpty && status.state != "ready" { return .red }
+        switch status.state {
+        case "ready": return .green
+        case "pairing", "discovering_ancs", "connected": return .orange
+        case "advertising": return .blue
+        default: return .red
+        }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                HStack(spacing: 12) {
+                    Circle().fill(stateColor).frame(width: 12, height: 12)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(stateTitle).font(.headline)
+                        Text(isStale ? "Данные устарели" : "Статус актуален")
+                            .font(.caption).foregroundStyle(isStale ? .orange : .secondary)
+                    }
+                }
+            }
+
+            Section("Соединение") {
+                LabeledContent("Bluetooth", value: ble.bluetoothState)
+                LabeledContent("Устройство", value: ble.connectedName ?? "Не подключено")
+                LabeledContent("UUID", value: ble.connectedIdentifier?.uuidString ?? "—")
+                LabeledContent("RSSI", value: status.rssi.map { "\($0) dBm" } ?? "—")
+                LabeledContent("Последний пакет", value: status.lastPacketAt?.formatted(date: .omitted, time: .standard) ?? "—")
+            }
+
+            Section("Модуль") {
+                LabeledContent("Прошивка", value: status.firmwareVersion)
+                LabeledContent("Состояние", value: stateTitle)
+                LabeledContent("Время работы", value: formatUptime(status.uptimeMS))
+                LabeledContent("ANCS-сессия", value: status.sessionID)
+            }
+
+            Section("ANCS") {
+                LabeledContent("Уведомления", value: ble.ancsReady ? "Готовы" : "Не готовы")
+                LabeledContent("Приложение подписано", value: ble.bridgeReady ? "Да" : "Нет")
+                LabeledContent("Попыток обнаружения", value: "\(status.ancsAttempts)")
+            }
+
+            Section("Передача") {
+                LabeledContent("Передано", value: "\(status.forwarded)")
+                LabeledContent("Подтверждено", value: "\(status.acknowledged)")
+                LabeledContent("Ожидает ACK", value: "\(status.queuePending)")
+                LabeledContent("Ёмкость очереди", value: "\(status.queueCapacity)")
+                LabeledContent("Потеряно", value: "\(status.dropped)")
+                if status.queueCapacity > 0 {
+                    ProgressView(value: Double(status.queuePending), total: Double(status.queueCapacity))
+                        .tint(status.queuePending == status.queueCapacity ? .red : .indigo)
+                }
+            }
+
+            Section("Диагностика") {
+                LabeledContent("Подключений", value: "\(status.reconnects)")
+                LabeledContent("Последняя ошибка", value: status.lastError.isEmpty ? "Нет" : status.lastError)
+                if status.lastErrorUptimeMS > 0 {
+                    LabeledContent("Ошибка на времени", value: formatUptime(status.lastErrorUptimeMS))
+                }
+            }
+        }
+        .navigationTitle("Статус модуля")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            Button {
+                ble.refreshModuleStatus()
+            } label: {
+                Label("Обновить", systemImage: "arrow.clockwise")
+            }
+        }
+        .onAppear {
+            now = Date()
+            ble.refreshModuleStatus()
+        }
+        .onReceive(timer) { date in
+            now = date
+            ble.refreshModuleStatus()
+        }
+    }
+
+    private func formatUptime(_ milliseconds: UInt64) -> String {
+        let totalSeconds = milliseconds / 1000
+        let days = totalSeconds / 86_400
+        let hours = (totalSeconds % 86_400) / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let seconds = totalSeconds % 60
+        if days > 0 { return "\(days) д \(hours) ч \(minutes) мин" }
+        if hours > 0 { return "\(hours) ч \(minutes) мин \(seconds) с" }
+        return "\(minutes) мин \(seconds) с"
     }
 }
 
@@ -273,7 +401,7 @@ private struct SettingsView: View {
                 }
 
                 Section("О приложении") {
-                    LabeledContent("XIAO Notify", value: "1.0.0")
+                    LabeledContent("XIAO Notify", value: "1.2.0")
                     Text("Уведомления передаются модулем XIAO nRF52840 через Apple Notification Center Service.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
