@@ -1,72 +1,48 @@
-# XIAO Companion
+# XIAO Notify
 
-Minimal unsigned iOS companion app for Seeed Studio XIAO nRF52840 BLE testing.
+Готовая связка из прошивки Seeed Studio XIAO nRF52840 и iOS-приложения. Модуль получает уведомления текущего iPhone через Apple Notification Center Service (ANCS) и отправляет их приложению по собственному BLE-сервису.
 
-The app:
+## Возможности
 
-- scans for BLE peripherals;
-- connects to a selected device;
-- subscribes to every notify/indicate characteristic it finds;
-- logs incoming BLE packets as text or hex;
-- can POST received packets to your API endpoint.
-- remembers the selected BLE peripheral and tries to reconnect later;
-- shows a local iOS notification when XIAO sends a BLE packet.
+- история последних 1000 уведомлений и 1000 системных событий;
+- фильтры «Все», OKX, Binance, Bybit, Simple и «Другое»;
+- встроенные иконки известных приложений и цветные инициалы для остальных;
+- обработка Added, Modified и Removed в выбираемом режиме;
+- журнал подключения, потери связи, восстановления, ANCS и ошибок протокола;
+- автоматическое переподключение и восстановление CoreBluetooth;
+- сохранение истории между запусками без внешнего сервера.
 
-## Build IPA with GitHub Actions
+## Прошивка XIAO nRF52840
 
-1. Create a GitHub repository.
-2. Push this folder to the repository.
-3. Open `Actions`.
-4. Run `Build iOS IPA`.
-5. Download the `XIAOCompanion-unsigned-ipa` artifact.
-6. Install `XIAOCompanion.ipa` with SideStore.
+Файл прошивки: `XIAO_ANCS_AppBridge/XIAO_ANCS_AppBridge.ino`.
 
-The app is intentionally built without signing:
+1. Установите Arduino IDE и пакет плат Seeed nRF52 Boards.
+2. Выберите `Seeed XIAO nRF52840` и библиотеку Adafruit Bluefruit nRF52 из пакета платы.
+3. Откройте `.ino`, соберите и загрузите его на модуль.
+4. В настройках Bluetooth iPhone выберите `XIAO Notify Bridge` и подтвердите сопряжение.
+5. Разрешите модулю показывать уведомления, когда iOS предложит доступ ANCS.
 
-```sh
-CODE_SIGNING_ALLOWED=NO
-```
-
-SideStore signs it on the phone.
-
-## First Test
-
-1. Open the app.
-2. Allow Bluetooth.
-3. Tap `Scan for XIAO`.
-4. Connect to your BLE device.
-5. Send data from XIAO through a notify characteristic.
-
-For database upload, enter an HTTPS endpoint and enable auto upload.
-
-## XIAO Firmware
-
-Use this Arduino sketch:
+Сервис приложения использует UUID:
 
 ```text
-XIAO_ANCS_AppBridge/XIAO_ANCS_AppBridge.ino
+Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E
+RX:      6E400002-B5A3-F393-E0A9-E50E24DCCA9E (write)
+TX:      6E400003-B5A3-F393-E0A9-E50E24DCCA9E (notify)
 ```
 
-It keeps ANCS receiving enabled and adds a custom BLE service:
+Протокол версии 1 — UTF-8 JSON Lines. Один JSON завершается `\n` и может быть разделён на любое число BLE-пакетов. Типы сообщений: `notification`, `status`, `log`. Неизвестные поля должны игнорироваться.
 
-```text
-Service:        6E400001-B5A3-F393-E0A9-E50E24DCCA9E
-Notify char:    6E400003-B5A3-F393-E0A9-E50E24DCCA9E
-Device name:    XIAO ANCS Bridge
-```
+## Установка iOS-приложения
 
-When XIAO receives an iOS notification, it sends JSON to the app through the notify characteristic. The app will show it in `Incoming BLE Data`.
+1. Запустите GitHub Actions workflow `Build iOS IPA`.
+2. Скачайте артефакт `XIAO-Notify-unsigned-ipa`.
+3. Подпишите и установите `XIAO-Notify.ipa` через SideStore или AltStore.
+4. Разрешите Bluetooth, откройте «Настройки» → «Найти XIAO Notify» и выберите модуль.
 
-If XIAO is already connected to iOS for ANCS, it may not appear in normal scan results. The app also checks already connected peripherals with the bridge service UUID, so tap `Scan for XIAO` and then tap `XIAO Bridge` / `XIAO ANCS Bridge` if it appears.
+После первого соединения приложение запоминает устройство. Зелёный индикатор означает, что BLE-канал и ANCS готовы.
 
-## Background behavior
+## Важные ограничения iOS
 
-The app includes `bluetooth-central` background mode. iOS can wake it for BLE events, restored connections, and reconnects, but it does not allow unlimited background execution.
+ANCS передаёт Bundle ID, имя, категорию, заголовок и текст, но не иконку приложения и не исходное время создания уведомления. Поэтому иконки четырёх известных приложений встроены, для остальных используются инициалы, а временем записи считается момент получения.
 
-Important: the app cannot directly see the private system ANCS connection state. If XIAO is connected to iOS for ANCS, your firmware should also expose a custom BLE service/characteristic and send a packet like:
-
-```json
-{"type":"status","ancs_connected":true}
-```
-
-The app will display any packet it receives and show a local notification.
+Приложение не создаёт повторный системный баннер: исходное уведомление iOS уже было показано пользователю.

@@ -17,6 +17,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Run protocol tests
+        run: node --test tests/protocol.test.js
+
       - name: Build unsigned app
         run: |
           xcodebuild \
@@ -31,11 +34,11 @@ jobs:
       - name: Create unsigned IPA
         run: |
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/XIAOCompanion.app Payload/
-          /usr/bin/zip -r XIAOCompanion.ipa Payload
+          cp -R "build/Build/Products/Release-iphoneos/XIAO Notify.app" Payload/
+          /usr/bin/zip -r XIAO-Notify.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: XIAOCompanion-unsigned-ipa
-          path: XIAOCompanion.ipa
+          name: XIAO-Notify-unsigned-ipa
+          path: XIAO-Notify.ipa

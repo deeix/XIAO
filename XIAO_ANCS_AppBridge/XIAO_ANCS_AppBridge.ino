@@ -1,295 +1,276 @@
 /*********************************************************************
- This sketch receives iOS ANCS notifications and forwards a compact
- JSON packet to the XIAO Companion iOS app through a custom BLE
- notify characteristic.
+ XIAO Notify firmware for Seeed Studio XIAO nRF52840.
+ Receives iOS notifications through ANCS and forwards newline-delimited
+ UTF-8 JSON to the XIAO Notify companion app.
 *********************************************************************/
 
 #include <bluefruit.h>
 
-// BLE Client Service
 BLEClientDis bleClientDis;
-BLEAncs      bleancs;
+BLEAncs bleancs;
 
-// Custom BLE service for the iOS companion app.
-// The app scans/subscribes to notify characteristics and will show
-// packets sent through xiaoNotifyChar in its log.
-BLEService xiaoBridgeService("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
-BLECharacteristic xiaoNotifyChar("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
+BLEService bridgeService("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+BLECharacteristic bridgeRx("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
+BLECharacteristic bridgeTx("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
-#define BUFSIZE 128
-char buffer[BUFSIZE];
+static const uint8_t PROTOCOL_VERSION = 1;
+static const size_t ATTRIBUTE_SIZE = 256;
+static const size_t JSON_SIZE = 2560;
+static const size_t CHUNK_SIZE = 180;
 
-#define JSON_BUFSIZE 384
-char jsonBuffer[JSON_BUFSIZE];
+char jsonBuffer[JSON_SIZE];
+uint32_t forwardedCount = 0;
+uint32_t droppedCount = 0;
+bool ancsReady = false;
+bool appSubscribed = false;
 
-const char* EVENT_STR[] = { "Added", "Modified", "Removed" };
-const char* CAT_STR[] =
-{
-  "Other"             , "Incoming Call"       , "Missed Call", "Voice Mail"   ,
-  "Social"            , "Schedule"            , "Email"      , "News"         ,
-  "Health and Fitness", "Business and Finance", "Location"   , "Entertainment"
+const char* EVENT_NAMES[] = { "Added", "Modified", "Removed" };
+const char* CATEGORY_NAMES[] = {
+  "Other", "Incoming Call", "Missed Call", "Voice Mail", "Social",
+  "Schedule", "Email", "News", "Health and Fitness",
+  "Business and Finance", "Location", "Entertainment"
 };
 
-void setup()
-{
-  Serial.begin(115200);
+void startAdvertising();
+void sendStatus(const char* event, const char* detail = "");
+void sendLog(const char* level, const char* event, const char* detail = "");
+bool sendFrame(const char* text);
 
-  Serial.println("XIAO ANCS App Bridge");
-  Serial.println("--------------------\n");
+void setup() {
+  Serial.begin(115200);
+  delay(50);
+  Serial.println("XIAO Notify 1.0.0");
 
   Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
-
   Bluefruit.begin();
-  Bluefruit.setName("XIAO ANCS Bridge");
+  Bluefruit.setName("XIAO Notify Bridge");
   Bluefruit.setTxPower(4);
-  Bluefruit.Periph.setConnectCallback(connect_callback);
-  Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
-
-  Bluefruit.Security.setSecuredCallback(connection_secured_callback);
+  Bluefruit.Periph.setConnectCallback(connectCallback);
+  Bluefruit.Periph.setDisconnectCallback(disconnectCallback);
+  Bluefruit.Security.setSecuredCallback(securedCallback);
 
   bleClientDis.begin();
-
   bleancs.begin();
-  bleancs.setNotificationCallback(ancs_notification_callback);
+  bleancs.setNotificationCallback(ancsNotificationCallback);
 
-  setupXiaoBridgeService();
-  startAdv();
+  bridgeService.begin();
+
+  bridgeRx.setProperties(CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
+  bridgeRx.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  bridgeRx.setMaxLen(64);
+  bridgeRx.setWriteCallback(rxCallback);
+  bridgeRx.begin();
+
+  bridgeTx.setProperties(CHR_PROPS_NOTIFY);
+  bridgeTx.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
+  bridgeTx.setMaxLen(244);
+  bridgeTx.setCccdWriteCallback(cccdCallback);
+  bridgeTx.begin();
+
+  startAdvertising();
+  Serial.println("Advertising started");
 }
 
-void setupXiaoBridgeService()
-{
-  xiaoBridgeService.begin();
-
-  xiaoNotifyChar.setProperties(CHR_PROPS_NOTIFY);
-  xiaoNotifyChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
-  xiaoNotifyChar.setMaxLen(244);
-  xiaoNotifyChar.begin();
+void loop() {
+  delay(20);
 }
 
-void startAdv(void)
-{
+void startAdvertising() {
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
-
   Bluefruit.Advertising.addService(bleancs);
-  Bluefruit.Advertising.addService(xiaoBridgeService);
-
+  Bluefruit.Advertising.addService(bridgeService);
   Bluefruit.ScanResponse.addName();
-
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.start(0);
 }
 
-void loop()
-{
-  if (!Bluefruit.connected()) return;
-  if (!bleancs.discovered()) return;
-}
+void connectCallback(uint16_t connHandle) {
+  BLEConnection* connection = Bluefruit.Connection(connHandle);
+  ancsReady = false;
+  appSubscribed = false;
+  Serial.println("iPhone connected; discovering ANCS");
 
-void connect_callback(uint16_t conn_handle)
-{
-  BLEConnection* conn = Bluefruit.Connection(conn_handle);
-
-  Serial.println("Connected");
-  sendToApp("{\"type\":\"status\",\"ble_connected\":true}");
-
-  Serial.print("Discovering DIS ... ");
-  if (bleClientDis.discover(conn_handle))
-  {
-    Serial.println("Discovered");
-
-    memset(buffer, 0, BUFSIZE);
-    if (bleClientDis.getManufacturer(buffer, BUFSIZE))
-    {
-      Serial.print("Manufacturer: ");
-      Serial.println(buffer);
-    }
-
-    memset(buffer, 0, BUFSIZE);
-    if (bleClientDis.getModel(buffer, BUFSIZE))
-    {
-      Serial.print("Model: ");
-      Serial.println(buffer);
-    }
-
-    Serial.println();
-  }
-
-  Serial.print("Discovering ANCS ... ");
-  if (bleancs.discover(conn_handle))
-  {
-    Serial.println("Discovered");
-    Serial.print("Attempting to PAIR with the iOS device, please press PAIR on your phone ... ");
-    conn->requestPairing();
+  bleClientDis.discover(connHandle);
+  if (bleancs.discover(connHandle)) {
+    connection->requestPairing();
+  } else {
+    Serial.println("ANCS discovery failed");
   }
 }
 
-void connection_secured_callback(uint16_t conn_handle)
-{
-  BLEConnection* conn = Bluefruit.Connection(conn_handle);
-
-  if (!conn->secured())
-  {
-    conn->requestPairing();
+void securedCallback(uint16_t connHandle) {
+  BLEConnection* connection = Bluefruit.Connection(connHandle);
+  if (!connection->secured()) {
+    connection->requestPairing();
+    return;
   }
-  else
-  {
-    Serial.println("Secured");
-    sendToApp("{\"type\":\"status\",\"secured\":true}");
 
-    if (bleancs.discovered())
-    {
-      Serial.println("Enabling notifications");
-      Serial.println();
-      bleancs.enableNotification();
-      sendToApp("{\"type\":\"status\",\"ancs_connected\":true}");
-    }
+  if (bleancs.discovered() && bleancs.enableNotification()) {
+    ancsReady = true;
+    Serial.println("ANCS ready");
+    sendStatus("ancs_ready", "Notifications enabled");
+  } else {
+    sendLog("error", "ancs_enable_failed", "Could not enable ANCS notifications");
   }
 }
 
-void ancs_notification_callback(AncsNotification_t* notif)
-{
-  uint32_t const uid = notif->uid;
-
-  char appID[128] = { 0 };
-  char appName[128] = { 0 };
-  char title[128] = { 0 };
-  char message[128] = { 0 };
-
-  bleancs.getAppID(uid, appID, sizeof(appID));
-
-  memset(buffer, 0, BUFSIZE);
-  bleancs.getAppAttribute(appID, ANCS_APP_ATTR_DISPLAY_NAME, buffer, BUFSIZE);
-  strncpy(appName, buffer, sizeof(appName) - 1);
-
-  Serial.printf("%-15s (%s)\n", appName, appID);
-
-  memset(buffer, 0, BUFSIZE);
-  if (bleancs.getTitle(uid, buffer, BUFSIZE))
-  {
-    removeBidiMarks(buffer);
-    strncpy(title, buffer, sizeof(title) - 1);
-  }
-
-  Serial.printf("%-15s %s\n", title, EVENT_STR[notif->eventID]);
-
-  memset(buffer, 0, BUFSIZE);
-  bleancs.getMessage(uid, buffer, BUFSIZE);
-  strncpy(message, buffer, sizeof(message) - 1);
-  Serial.printf("  %s\n", message);
-  Serial.println();
-
-  char escapedApp[128];
-  char escapedTitle[128];
-  char escapedMessage[128];
-
-  jsonEscape(appName, escapedApp, sizeof(escapedApp));
-  jsonEscape(title, escapedTitle, sizeof(escapedTitle));
-  jsonEscape(message, escapedMessage, sizeof(escapedMessage));
-
-  snprintf(jsonBuffer, sizeof(jsonBuffer),
-           "{\"type\":\"notification\",\"uid\":%lu,\"event\":\"%s\",\"category\":\"%s\",\"app\":\"%s\",\"title\":\"%s\",\"message\":\"%s\"}",
-           uid,
-           EVENT_STR[notif->eventID],
-           categoryName(notif->categoryID),
-           escapedApp,
-           escapedTitle,
-           escapedMessage);
-
-  sendToApp(jsonBuffer);
-
-  // Keep/remove this block as you need. It auto-accepts incoming calls.
-  if (notif->categoryID == ANCS_CAT_INCOMING_CALL && notif->eventID == ANCS_EVT_NOTIFICATION_ADDED)
-  {
-    Serial.println("Incoming call accepted");
-    bleancs.performAction(notif->uid, ANCS_ACTION_POSITIVE);
-  }
-}
-
-void disconnect_callback(uint16_t conn_handle, uint8_t reason)
-{
-  (void) conn_handle;
-
-  Serial.println();
-  Serial.print("Disconnected, reason = 0x");
+void disconnectCallback(uint16_t connHandle, uint8_t reason) {
+  (void)connHandle;
+  ancsReady = false;
+  appSubscribed = false;
+  Serial.print("Disconnected: 0x");
   Serial.println(reason, HEX);
 }
 
-void sendToApp(const char* text)
-{
-  if (!Bluefruit.connected()) return;
-
-  size_t len = strlen(text);
-  if (len == 0) return;
-
-  Serial.print("App bridge: ");
-  Serial.println(text);
-
-  // Keep each notify packet small enough for typical negotiated MTU.
-  // The iOS app logs each packet immediately.
-  const size_t chunkSize = 180;
-  for (size_t offset = 0; offset < len; offset += chunkSize)
-  {
-    size_t partLen = min(chunkSize, len - offset);
-    xiaoNotifyChar.notify((const uint8_t*) text + offset, partLen);
-    delay(20);
+void cccdCallback(uint16_t connHandle, BLECharacteristic* characteristic, uint16_t value) {
+  (void)connHandle;
+  (void)characteristic;
+  appSubscribed = value != 0;
+  if (appSubscribed) {
+    Serial.println("Companion subscribed");
+    sendStatus("bridge_ready", "XIAO Notify subscribed");
+  } else {
+    Serial.println("Companion unsubscribed");
   }
 }
 
-void removeBidiMarks(char* text)
-{
-  char u202D[3] = { 0xE2, 0x80, 0xAD };
-  char u202C[3] = { 0xE2, 0x80, 0xAC };
+void rxCallback(uint16_t connHandle, BLECharacteristic* characteristic, uint8_t* data, uint16_t len) {
+  (void)connHandle;
+  (void)characteristic;
+  char command[65] = {0};
+  len = min((uint16_t)64, len);
+  memcpy(command, data, len);
 
-  int len = strlen(text);
-
-  if (len >= 3 && 0 == memcmp(&text[len - 3], u202C, 3))
-  {
-    len -= 3;
-    text[len] = 0;
-  }
-
-  if (len >= 3 && 0 == memcmp(text, u202D, 3))
-  {
-    memmove(text, text + 3, len - 2);
+  if (strstr(command, "status") || strstr(command, "hello")) {
+    sendStatus("snapshot", ancsReady ? "ANCS ready" : "Waiting for ANCS");
+  } else {
+    sendLog("warning", "unknown_command", command);
   }
 }
 
-void jsonEscape(const char* input, char* output, size_t outputSize)
-{
-  if (outputSize == 0) return;
+void ancsNotificationCallback(AncsNotification_t* notification) {
+  if (notification->eventID > ANCS_EVT_NOTIFICATION_REMOVED) return;
 
-  size_t out = 0;
-  for (size_t i = 0; input[i] != 0 && out + 1 < outputSize; i++)
-  {
-    char c = input[i];
+  const char* eventName = EVENT_NAMES[notification->eventID];
+  const char* category = categoryName(notification->categoryID);
 
-    if ((c == '"' || c == '\\') && out + 2 < outputSize)
-    {
-      output[out++] = '\\';
-      output[out++] = c;
-    }
-    else if ((uint8_t)c < 0x20)
-    {
-      output[out++] = ' ';
-    }
-    else
-    {
-      output[out++] = c;
-    }
+  // Removed events frequently have no readable attributes. UID is enough for
+  // the app to update the existing record without creating a blank duplicate.
+  if (notification->eventID == ANCS_EVT_NOTIFICATION_REMOVED) {
+    snprintf(jsonBuffer, sizeof(jsonBuffer),
+      "{\"v\":%u,\"type\":\"notification\",\"uid\":%lu,\"event\":\"Removed\",\"category\":\"%s\",\"received_ms\":%lu}",
+      PROTOCOL_VERSION, notification->uid, category, millis());
+    if (sendFrame(jsonBuffer)) forwardedCount++; else droppedCount++;
+    return;
   }
 
-  output[out] = 0;
+  char appId[ATTRIBUTE_SIZE] = {0};
+  char appName[ATTRIBUTE_SIZE] = {0};
+  char title[ATTRIBUTE_SIZE] = {0};
+  char message[ATTRIBUTE_SIZE] = {0};
+  char escapedId[ATTRIBUTE_SIZE * 2] = {0};
+  char escapedName[ATTRIBUTE_SIZE * 2] = {0};
+  char escapedTitle[ATTRIBUTE_SIZE * 2] = {0};
+  char escapedMessage[ATTRIBUTE_SIZE * 2] = {0};
+
+  bleancs.getAppID(notification->uid, appId, sizeof(appId));
+  bleancs.getAppAttribute(appId, ANCS_APP_ATTR_DISPLAY_NAME, appName, sizeof(appName));
+  bleancs.getTitle(notification->uid, title, sizeof(title));
+  bleancs.getMessage(notification->uid, message, sizeof(message));
+  removeBidiMarks(title);
+  removeBidiMarks(message);
+
+  jsonEscape(appId, escapedId, sizeof(escapedId));
+  jsonEscape(appName, escapedName, sizeof(escapedName));
+  jsonEscape(title, escapedTitle, sizeof(escapedTitle));
+  jsonEscape(message, escapedMessage, sizeof(escapedMessage));
+  const char* source = classifySource(appId, appName);
+
+  snprintf(jsonBuffer, sizeof(jsonBuffer),
+    "{\"v\":%u,\"type\":\"notification\",\"uid\":%lu,\"event\":\"%s\",\"source\":\"%s\",\"app_id\":\"%s\",\"app\":\"%s\",\"category\":\"%s\",\"title\":\"%s\",\"message\":\"%s\",\"received_ms\":%lu}",
+    PROTOCOL_VERSION, notification->uid, eventName, source, escapedId,
+    escapedName, category, escapedTitle, escapedMessage, millis());
+
+  if (sendFrame(jsonBuffer)) forwardedCount++; else droppedCount++;
 }
 
-const char* categoryName(uint8_t categoryID)
-{
-  if (categoryID < (sizeof(CAT_STR) / sizeof(CAT_STR[0])))
-  {
-    return CAT_STR[categoryID];
+bool sendFrame(const char* text) {
+  if (!Bluefruit.connected() || !appSubscribed || !text || !text[0]) return false;
+  size_t length = strlen(text);
+  for (size_t offset = 0; offset < length; offset += CHUNK_SIZE) {
+    size_t part = min(CHUNK_SIZE, length - offset);
+    if (!bridgeTx.notify((const uint8_t*)text + offset, part)) return false;
+    delay(12);
   }
+  const uint8_t newline = '\n';
+  return bridgeTx.notify(&newline, 1);
+}
 
+void sendStatus(const char* event, const char* detail) {
+  char escaped[192] = {0};
+  jsonEscape(detail, escaped, sizeof(escaped));
+  snprintf(jsonBuffer, sizeof(jsonBuffer),
+    "{\"v\":%u,\"type\":\"status\",\"event\":\"%s\",\"detail\":\"%s\",\"ancs_ready\":%s,\"subscribed\":%s,\"forwarded\":%lu,\"dropped\":%lu,\"uptime_ms\":%lu}",
+    PROTOCOL_VERSION, event, escaped, ancsReady ? "true" : "false",
+    appSubscribed ? "true" : "false", forwardedCount, droppedCount, millis());
+  sendFrame(jsonBuffer);
+}
+
+void sendLog(const char* level, const char* event, const char* detail) {
+  char escaped[256] = {0};
+  jsonEscape(detail, escaped, sizeof(escaped));
+  snprintf(jsonBuffer, sizeof(jsonBuffer),
+    "{\"v\":%u,\"type\":\"log\",\"level\":\"%s\",\"event\":\"%s\",\"detail\":\"%s\",\"uptime_ms\":%lu}",
+    PROTOCOL_VERSION, level, event, escaped, millis());
+  sendFrame(jsonBuffer);
+}
+
+const char* classifySource(const char* appId, const char* appName) {
+  String value = String(appId) + " " + String(appName);
+  value.toLowerCase();
+  if (value.indexOf("simple") >= 0 || value.indexOf("app.simple.com") >= 0) return "simple";
+  if (value.indexOf("binance") >= 0) return "binance";
+  if (value.indexOf("bybit") >= 0) return "bybit";
+  if (value.indexOf("okx") >= 0 || value.indexOf("okex") >= 0) return "okx";
+  return "other";
+}
+
+const char* categoryName(uint8_t id) {
+  if (id < sizeof(CATEGORY_NAMES) / sizeof(CATEGORY_NAMES[0])) return CATEGORY_NAMES[id];
   return "Unknown";
+}
+
+void removeBidiMarks(char* text) {
+  if (!text) return;
+  const uint8_t marks[][3] = {{0xE2, 0x80, 0xAD}, {0xE2, 0x80, 0xAC},
+                              {0xE2, 0x80, 0x8E}, {0xE2, 0x80, 0x8F}};
+  size_t length = strlen(text);
+  for (size_t mark = 0; mark < 4; mark++) {
+    for (size_t i = 0; i + 2 < length;) {
+      if (memcmp(text + i, marks[mark], 3) == 0) {
+        memmove(text + i, text + i + 3, length - i - 2);
+        length -= 3;
+      } else i++;
+    }
+  }
+}
+
+void jsonEscape(const char* input, char* output, size_t outputSize) {
+  if (!outputSize) return;
+  size_t out = 0;
+  for (size_t i = 0; input && input[i] && out + 1 < outputSize; i++) {
+    uint8_t c = input[i];
+    if ((c == '"' || c == '\\') && out + 2 < outputSize) {
+      output[out++] = '\\'; output[out++] = c;
+    } else if (c == '\n' || c == '\r' || c == '\t') {
+      if (out + 2 >= outputSize) break;
+      output[out++] = '\\'; output[out++] = c == '\n' ? 'n' : (c == '\r' ? 'r' : 't');
+    } else if (c < 0x20) {
+      output[out++] = ' ';
+    } else output[out++] = c;
+  }
+  output[out] = 0;
 }

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>XIAO Companion</string>
+	<string>XIAO Notify</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -23,9 +23,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>This app connects to your XIAO BLE keychain.</string>
+	<string>XIAO Notify подключается к модулю XIAO для получения уведомлений.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>This app connects to your XIAO BLE keychain.</string>
+	<string>XIAO Notify подключается к модулю XIAO для получения уведомлений.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
