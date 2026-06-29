@@ -83,6 +83,15 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(store.notifications.first?.sequence, 2)
     }
 
+    func testKnownApplicationSourceDetection() {
+        XCTAssertEqual(AppSource.detect(source: nil, appID: "app.simple.com", appName: "Simple"), .simple)
+        XCTAssertEqual(AppSource.detect(source: nil, appID: "com.okex.OKEx", appName: "OKX"), .okx)
+        XCTAssertEqual(AppSource.detect(source: nil, appID: "com.binance.dev", appName: "Binance"), .binance)
+        XCTAssertEqual(AppSource.detect(source: nil, appID: "com.bybit.app", appName: "Bybit"), .bybit)
+        XCTAssertEqual(AppSource.detect(source: nil, appID: "com.google.Gmail", appName: "Gmail"), .gmail)
+        XCTAssertEqual(AppSource.detect(source: nil, appID: "com.apple.MobileSMS", appName: "Сообщения"), .other)
+    }
+
     private func process(_ packet: BridgePacket, in store: AppStore, file: StaticString = #filePath, line: UInt = #line) {
         let expectation = expectation(description: "packet persisted")
         var persisted = false

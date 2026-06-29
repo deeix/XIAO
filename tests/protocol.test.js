@@ -17,8 +17,9 @@ function decodeChunks(chunks) {
 }
 
 function classify(source, appID = '', app = '') {
-  if (['okx', 'binance', 'bybit', 'simple', 'other'].includes(source)) return source;
+  if (['okx', 'binance', 'bybit', 'simple', 'gmail', 'other'].includes(source)) return source;
   const value = `${appID} ${app}`.toLowerCase();
+  if (value.includes('gmail') || value.includes('googlemail') || value.includes('com.google.gmail')) return 'gmail';
   if (value.includes('simple') || value.includes('app.simple.com')) return 'simple';
   if (value.includes('binance')) return 'binance';
   if (value.includes('bybit')) return 'bybit';
@@ -78,6 +79,7 @@ test('classifies known and unknown applications', () => {
   assert.equal(classify(undefined, 'com.okex.OKEx', 'OKX'), 'okx');
   assert.equal(classify(undefined, 'com.binance.dev', 'Binance'), 'binance');
   assert.equal(classify(undefined, 'com.bybit.app', 'Bybit'), 'bybit');
+  assert.equal(classify(undefined, 'com.google.Gmail', 'Gmail'), 'gmail');
   assert.equal(classify(undefined, 'com.apple.MobileSMS', 'Сообщения'), 'other');
 });
 

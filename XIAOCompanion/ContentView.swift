@@ -1,6 +1,8 @@
 import Combine
 import Foundation
+import ObjectiveC
 import SwiftUI
+import UIKit
 
 private enum NotificationFilter: String, CaseIterable, Identifiable {
     case all, okx, binance, bybit, simple, other
@@ -31,6 +33,13 @@ private enum AppTheme {
     static let surface = Color(.secondarySystemBackground)
     static let elevated = Color(.systemBackground)
     static let grouped = Color(.systemGroupedBackground)
+}
+
+private extension NotificationRecord {
+    var hasVisibleContent: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 struct ContentView: View {
@@ -89,8 +98,13 @@ private struct NotificationsView: View {
     @State private var filter: NotificationFilter = .all
 
     private var records: [NotificationRecord] {
-        guard let source = filter.source else { return ble.store.notifications }
-        return ble.store.notifications.filter { $0.source == source }
+        let sourceFiltered: [NotificationRecord]
+        if let source = filter.source {
+            sourceFiltered = ble.store.notifications.filter { $0.source == source }
+        } else {
+            sourceFiltered = ble.store.notifications
+        }
+        return sourceFiltered.filter(\.hasVisibleContent)
     }
 
     private var removedCount: Int {
@@ -668,9 +682,6 @@ private struct NotificationRow: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
-                        Text(record.category)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text(record.receivedAt, style: .time)
@@ -721,12 +732,18 @@ private struct SourceIcon: View {
     let source: AppSource
     let name: String
     let appID: String
+    @State private var privateIcon: UIImage?
 
     private var initials: String {
         let base = name.isEmpty ? appID : name
         let parts = base.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
         let value = parts.prefix(2).compactMap(\.first).map(String.init).joined()
         return String((value.isEmpty ? "?" : value).prefix(2)).uppercased()
+    }
+
+    private var bundledAssetName: String? {
+        let assetName = source.rawValue
+        return UIImage(named: assetName) == nil ? nil : assetName
     }
 
     private var generatedColor: Color {
@@ -736,7 +753,17 @@ private struct SourceIcon: View {
 
     var body: some View {
         Group {
-            if source == .other {
+            if let privateIcon = privateIcon {
+                Image(uiImage: privateIcon)
+                    .resizable()
+                    .scaledToFill()
+            } else if let bundledAssetName {
+                Image(bundledAssetName)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(source == .simple ? 0 : 5)
+                    .background(source == .simple ? Color.clear : AppTheme.elevated)
+            } else {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(generatedColor.gradient)
@@ -744,12 +771,6 @@ private struct SourceIcon: View {
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 }
-            } else {
-                Image(source.rawValue)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(source == .simple ? 0 : 5)
-                    .background(source == .simple ? Color.clear : AppTheme.elevated)
             }
         }
         .frame(width: 46, height: 46)
@@ -759,6 +780,39 @@ private struct SourceIcon: View {
                 .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
         )
         .accessibilityLabel(source == .other ? initials : source.title)
+        .onAppear { loadPrivateIcon() }
+        .onChange(of: appID) { _ in loadPrivateIcon() }
+    }
+
+    private func loadPrivateIcon() {
+        privateIcon = PrivateAppIconProvider.icon(bundleID: appID)
+    }
+}
+
+private enum PrivateAppIconProvider {
+    private static var cache: [String: UIImage] = [:]
+    private static var misses = Set<String>()
+
+    static func icon(bundleID: String) -> UIImage? {
+        let key = bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return nil }
+        if let cached = cache[key] { return cached }
+        if misses.contains(key) { return nil }
+        guard let image = loadPrivateIcon(bundleID: key) else {
+            misses.insert(key)
+            return nil
+        }
+        cache[key] = image
+        return image
+    }
+
+    private static func loadPrivateIcon(bundleID: String) -> UIImage? {
+        let selector = NSSelectorFromString("_applicationIconImageForBundleIdentifier:format:scale:")
+        guard let method = class_getClassMethod(UIImage.self, selector) else { return nil }
+        typealias IconFunction = @convention(c) (AnyClass, Selector, NSString, Int, CGFloat) -> UIImage?
+        let implementation = method_getImplementation(method)
+        let function = unsafeBitCast(implementation, to: IconFunction.self)
+        return function(UIImage.self, selector, bundleID as NSString, 2, UIScreen.main.scale)
     }
 }
 

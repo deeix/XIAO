@@ -3,7 +3,7 @@ import CoreBluetooth
 import Foundation
 
 enum AppSource: String, Codable, CaseIterable, Identifiable {
-    case okx, binance, bybit, simple, other
+    case okx, binance, bybit, simple, gmail, other
     var id: String { rawValue }
 
     var title: String {
@@ -12,6 +12,7 @@ enum AppSource: String, Codable, CaseIterable, Identifiable {
         case .binance: return "Binance"
         case .bybit: return "Bybit"
         case .simple: return "Simple"
+        case .gmail: return "Gmail"
         case .other: return "Другое"
         }
     }
@@ -19,6 +20,7 @@ enum AppSource: String, Codable, CaseIterable, Identifiable {
     static func detect(source: String?, appID: String?, appName: String?) -> AppSource {
         if let source, let exact = AppSource(rawValue: source.lowercased()) { return exact }
         let value = "\(appID ?? "") \(appName ?? "")".lowercased()
+        if value.contains("gmail") || value.contains("googlemail") || value.contains("com.google.gmail") { return .gmail }
         if value.contains("simple") || value.contains("app.simple.com") { return .simple }
         if value.contains("binance") { return .binance }
         if value.contains("bybit") { return .bybit }
