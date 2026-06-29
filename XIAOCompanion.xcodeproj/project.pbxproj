@@ -11,7 +11,9 @@
 		4F0000022C00000000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0000122C00000000000001 /* ContentView.swift */; };
 		4F0000032C00000000000001 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0000132C00000000000001 /* BLEManager.swift */; };
 		4F0000042C00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4F0000152C00000000000001 /* Assets.xcassets */; };
+		4F0000052C00000000000001 /* OKXOrderAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0000162C00000000000001 /* OKXOrderAnalyzer.swift */; };
 		4F1000012C00000000000001 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1000112C00000000000001 /* ProtocolTests.swift */; };
+		4F1000022C00000000000001 /* OKXOrderAnalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1000122C00000000000001 /* OKXOrderAnalyzerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,8 +33,10 @@
 		4F0000132C00000000000001 /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEManager.swift; sourceTree = "<group>"; };
 		4F0000142C00000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4F0000152C00000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4F0000162C00000000000001 /* OKXOrderAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OKXOrderAnalyzer.swift; sourceTree = "<group>"; };
 		4F1000102C00000000000001 /* XIAOCompanionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XIAOCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F1000112C00000000000001 /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
+		4F1000122C00000000000001 /* OKXOrderAnalyzerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OKXOrderAnalyzerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +72,7 @@
 				4F0000112C00000000000001 /* App.swift */,
 				4F0000122C00000000000001 /* ContentView.swift */,
 				4F0000132C00000000000001 /* BLEManager.swift */,
+				4F0000162C00000000000001 /* OKXOrderAnalyzer.swift */,
 				4F0000142C00000000000001 /* Info.plist */,
 				4F0000152C00000000000001 /* Assets.xcassets */,
 			);
@@ -87,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				4F1000112C00000000000001 /* ProtocolTests.swift */,
+				4F1000122C00000000000001 /* OKXOrderAnalyzerTests.swift */,
 			);
 			path = XIAOCompanionTests;
 			sourceTree = "<group>";
@@ -193,6 +199,7 @@
 				4F0000012C00000000000001 /* App.swift in Sources */,
 				4F0000022C00000000000001 /* ContentView.swift in Sources */,
 				4F0000032C00000000000001 /* BLEManager.swift in Sources */,
+				4F0000052C00000000000001 /* OKXOrderAnalyzer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,6 +208,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4F1000012C00000000000001 /* ProtocolTests.swift in Sources */,
+				4F1000022C00000000000001 /* OKXOrderAnalyzerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
